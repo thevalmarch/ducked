@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ducked.dev — The Constrained Canvas</title>
+    <meta name="description"
+        content="Paste a repo. Watch it live. Watch it die. Ephemeral code execution with brutal constraints.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ── Reset & Base ─────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-surface: #141414;
+            --bg-terminal: #0d1117;
+            --border: #1e1e1e;
+            --border-glow: #2a2a2a;
+
+            --text-primary: #e0e0e0;
+            --text-muted: #666666;
+            --text-terminal: #c9d1d9;
+
+            --accent: #f97316;
+            --accent-hover: #fb923c;
+            --phase-clone: #fbbf24;
+            --phase-build: #3b82f6;
+            --phase-run: #22c55e;
+            --phase-dead: #ef4444;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── State visibility ─────────────────────────────── */
+        .state {
+            display: none;
+        }
+
+        .state.active {
+            display: flex;
+        }
+
+        .constraints span:last-child {
+            border-right: none;
+        }
+
+        .disclaimer {
+            margin-top: 1.5rem;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            max-width: 400px;
+            line-height: 1.4;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        /* ── Phase Bar ─────────────────────────────────────── */
+        #state-idle {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        /* ── Watcher (Interactive Duck) ───────────────────── */
+        .watcher {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            /* head width */
+            height: 64px;
+            /* head height */
+            margin: 0 auto -25px auto;
+            /* negative margin to overcome flexbox gap and pull it tight */
+            background: #151515;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 30px 30px 20px 20px;
+            /* geometric head shape */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.03);
+            position: relative;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            z-index: 10;
+        }
+
+        .watcher-eyes {
+            display: flex;
+            gap: 12px;
+            margin-top: -6px;
+            /* positioned inside upper head */
+            margin-bottom: 8px;
+            z-index: 2;
+        }
+
+        .watcher-eye {
+            width: 14px;
+            height: 14px;
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .watcher-pupil {
+            width: 5px;
+            height: 5px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: background 0.3s, transform 0.1s;
+        }
+
+        .watcher-beak {
+            width: 26px;
+            height: 10px;
+            background: var(--accent);
+            /* flat orange beak */
+            border-radius: 6px 6px 12px 12px;
+            /* geometric beak shape */
+            transition: background 0.3s, width 0.3s, transform 0.3s, border-radius 0.3s;
+            z-index: 2;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Watcher States */
+        .watcher.focus {
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 2px 8px rgba(255, 255, 255, 0.06);
+        }
+
+        .watcher.focus .watcher-eye {
+            border-color: var(--text-primary);
+        }
+
+        .watcher.focus .watcher-pupil {
+            background: var(--accent);
+        }
+
+        .watcher.focus .watcher-beak {
+            transform: translateY(2px) scaleX(0.9);
+            /* slightly shifts down on focus */
+        }
+
+        .watcher.deploying {
+            border-color: var(--accent);
+            box-shadow: 0 0 30px rgba(249, 115, 22, 0.15), inset 0 1px 3px rgba(249, 115, 22, 0.3);
+        }
+
+        .watcher.deploying .watcher-eye {
+            border-color: var(--accent);
+            transform: scaleY(0.3);
+            /* squinting hard */
+        }
+
+        .watcher.deploying .watcher-pupil {
+            background: var(--accent);
+        }
+
+        .watcher.deploying .watcher-beak {
+            background: var(--accent-hover);
+            width: 32px;
+            /* opens/widens */
+            transform: translateY(3px);
+            border-radius: 10px;
+        }
+
+        .watcher.sleeping {
+            margin: 0 auto -25px auto;
+            border-color: rgba(255, 255, 255, 0.02);
+            box-shadow: none;
+            opacity: 0.5;
+        }
+
+        .watcher.sleeping .watcher-eye {
+            border: none;
+            border-top: 2px solid #444;
+            border-radius: 0;
+            height: 2px;
+            background: transparent;
+            transform: translateY(-2px);
+            /* Slightly move away from beak as requested earlier, but keep original style */
+        }
+
+        .watcher.sleeping .watcher-pupil {
+            opacity: 0;
+        }
+
+        .watcher.sleeping .watcher-beak {
+            background: var(--accent);
+            /* keep it orange but dim */
+            opacity: 0.6;
+            box-shadow: none;
+        }
+
+        /* Zzz Animation for sleeping watcher */
+        .zzz {
+            position: absolute;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            opacity: 0;
+            top: -10px;
+            right: -10px;
+            animation: floatZ 3s infinite linear;
+        }
+
+        .z1 {
+            animation-delay: 0s;
+            font-size: 16px;
+            right: -15px;
+        }
+
+        .z2 {
+            animation-delay: 1s;
+            font-size: 12px;
+            right: 5px;
+        }
+
+        .z3 {
+            animation-delay: 2s;
+            font-size: 10px;
+            right: -5px;
+        }
+
+        @keyframes floatZ {
+            0% {
+                transform: translate(0, 0) scale(0.5);
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 0.8;
+            }
+
+            80% {
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translate(15px, -30px) scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .brand {
+            text-align: center;
+        }
+
+        .brand h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+        }
+
+        .brand .tagline {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 400;
+        }
+
+        .launcher {
+            width: 100%;
+            max-width: 560px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        #repo-input {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #repo-input:focus {
+            border-color: var(--border-glow);
+        }
+
+        #repo-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn-deploy {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1.25rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-deploy:hover {
+            background: var(--accent-hover);
+            transform: scale(1.02);
+        }
+
+        .btn-deploy:active {
+            transform: scale(0.98);
+        }
+
+        .btn-deploy:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .constraints {
+            display: flex;
+            gap: 1.25rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .constraints span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        #deploy-error {
+            color: var(--error);
+            font-size: 0.8rem;
+            text-align: center;
+            display: none;
+        }
+
+        /* ── STATE 2: BUILDING ────────────────────────────── */
+        #state-building {
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Phase indicator bar */
+        .phase-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--bg-primary);
+            position: relative;
+            /* for indicator */
+        }
+
+        .phase-indicator {
+            position: absolute;
+            bottom: -1px;
+            /* overlap border */
+            height: 2px;
+            border-radius: 2px;
+            background: var(--text-primary);
+            transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s, box-shadow 0.4s;
+            left: 0;
+            width: 0;
+            opacity: 0;
+            z-index: 11;
+        }
+
+        .phase-step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            transition: color 0.3s;
+            padding: 0.25rem 0;
+        }
+
+        .phase-step.done {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        .phase-step.active {
+            color: var(--phase-build);
+        }
+
+        .phase-step.clone.active {
+            color: var(--phase-clone);
+        }
+
+        .phase-step.detect.active {
+            color: var(--text-primary);
+        }
+
+        .phase-step.build.active {
+            color: var(--phase-build);
+        }
+
+        .phase-step.run.active {
+            color: var(--phase-run);
+        }
+
+        .phase-connector {
+            width: 2rem;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* Terminal */
+        .terminal-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .terminal {
+            flex: 1;
+            background: var(--bg-terminal);
+            padding: 1rem 1.5rem;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: var(--text-terminal);
+        }
+
+        .terminal::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .terminal::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .terminal::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .log-line {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-phase {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .log-error {
+            color: var(--error);
+        }
+
+        .log-muted {
+            color: var(--text-muted);
+        }
+
+        /* ── STATE 3: RUNNING (split view) ────────────────── */
+        #state-running {
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .countdown-bar-wrap {
+            height: 3px;
+            background: var(--border);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .countdown-bar {
+            height: 100%;
+            width: 100%;
+            background: var(--phase-run);
+            transition: width 0.1s linear;
+        }
+
+        .countdown-bar.critical {
+            background: var(--phase-dead);
+        }
+
+        .countdown-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .countdown-info .status {
+            color: var(--phase-run);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .countdown-info .status.critical {
+            color: var(--phase-dead);
+        }
+
+        .countdown-info .timer {
+            color: var(--text-muted);
+        }
+
+        .split-view {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+        }
+
+        .split-view .panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .split-view .panel:first-child {
+            border-right: 1px solid var(--border);
+        }
+
+        .panel-header {
+            padding: 0.6rem 1rem;
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .preview-frame {
+            flex: 1;
+            border: none;
+            background: var(--bg-surface);
+            width: 100%;
+            height: 100%;
+        }
+
+        .preview-loading {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        #state-destroyed {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        .death-icon {
+            font-size: 3rem;
+            opacity: 0.8;
+        }
+
+        .death-message {
+            text-align: center;
+        }
+
+        .death-message h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+        }
+
+        .death-message p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .death-stats {
+            display: flex;
+            gap: 1.5rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+
+        .death-stats span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .log-archive {
+            width: 100%;
+            max-width: 700px;
+            margin-top: 1rem;
+        }
+
+        .log-archive summary {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0.5rem 0;
+            user-select: none;
+        }
+
+        .log-archive summary:hover {
+            color: var(--text-primary);
+        }
+
+        .log-archive .terminal {
+            max-height: 300px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-top: 0.5rem;
+            opacity: 0.7;
+        }
+
+        /* ── Responsive ───────────────────────────────────── */
+        @media (max-width: 768px) {
+            .split-view {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+
+            .split-view .panel:first-child {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .brand h1 {
+                font-size: 1.5rem;
+            }
+
+            .input-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ════════════ STATE 1: IDLE ════════════ -->
+    <section id="state-idle" class="state active">
+        <div class="watcher" id="watcher">
+            <div class="watcher-eyes">
+                <div class="watcher-eye">
+                    <div class="watcher-pupil"></div>
+                </div>
+                <div class="watcher-eye">
+                    <div class="watcher-pupil"></div>
+                </div>
+            </div>
+            <div class="watcher-beak"></div>
+        </div>
+        <div class="brand">
+            <h1>Ducked</h1>
+            <p class="tagline">Paste a repo. Watch it live. Watch it die.</p>
+        </div>
+        <div class="launcher">
+            <div class="input-row">
+                <input type="text" id="repo-input" placeholder="https://github.com/user/repo" spellcheck="false"
+                    autocomplete="off">
+                <button class="btn-deploy" id="btn-deploy" onclick="deploy()">Deploy</button>
+            </div>
+            <p id="deploy-error"></p>
+        </div>
+        <div class="constraints">
+            <span>CPU: 0.5</span>
+            <span>RAM: 256MB</span>
+            <span>TTL: 60s</span>
+            <span>Net: Isolated</span>
+        </div>
+        <div class="disclaimer">
+            This service is for educational and demonstration purposes. Abuse, malicious payloads, or excessive usage
+            may result in temporary rate limiting.
+        </div>
+    </section>
+
+    <!-- ════════════ STATE 2: BUILDING ════════════ -->
+    <section id="state-building" class="state">
+        <div class="phase-bar" id="phase-bar">
+            <div class="phase-indicator" id="phase-indicator"></div>
+            <div class="phase-step clone" id="phase-clone">clone</div>
+            <div class="phase-connector"></div>
+            <div class="phase-step detect" id="phase-detect">detect</div>
+            <div class="phase-connector"></div>
+            <div class="phase-step build" id="phase-build">build</div>
+            <div class="phase-connector"></div>
+            <div class="phase-step run" id="phase-run">run</div>
+        </div>
+        <div class="terminal-wrap">
+            <div class="terminal-header">
+                <span>terminal</span>
+                <span>—</span>
+                <span id="terminal-session-id"></span>
+            </div>
+            <div class="terminal" id="terminal-build"></div>
+        </div>
+    </section>
+
+    <!-- ════════════ STATE 3: RUNNING ════════════ -->
+    <section id="state-running" class="state">
+        <div class="countdown-bar-wrap">
+            <div class="countdown-bar" id="countdown-bar"></div>
+        </div>
+        <div class="countdown-info">
+            <div class="status" id="countdown-status">
+                <span>● Container alive</span>
+            </div>
+            <div class="timer" id="countdown-timer">60s remaining</div>
+        </div>
+        <div class="split-view">
+            <div class="panel">
+                <div class="panel-header">build log</div>
+                <div class="terminal" id="terminal-running"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">live preview</div>
+                <div class="preview-loading" id="preview-loading">Loading preview...</div>
+                <iframe class="preview-frame" id="preview-frame" style="display:none;"></iframe>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════ STATE 4: DESTROYED ════════════ -->
+    <section id="state-destroyed" class="state">
+        <div class="watcher sleeping">
+            <div class="zzz z1">Z</div>
+            <div class="zzz z2">z</div>
+            <div class="zzz z3">z</div>
+            <div class="watcher-eyes">
+                <div class="watcher-eye">
+                    <div class="watcher-pupil"></div>
+                </div>
+                <div class="watcher-eye">
+                    <div class="watcher-pupil"></div>
+                </div>
+            </div>
+            <div class="watcher-beak"></div>
+        </div>
+        <div class="death-message">
+            <h2>Session terminated.</h2>
+            <p>Zero traces remain. Quack.</p>
+        </div>
+        <div class="death-stats">
+            <span id="stat-lived">Lived: —</span>
+            <span id="stat-built">Built in: —</span>
+        </div>
+        <button class="btn-deploy" onclick="reset()">Deploy Another</button>
+        <details class="log-archive">
+            <summary>▸ Build log archive</summary>
+            <div class="terminal" id="terminal-archive"></div>
+        </details>
+    </section>
+
+    <script>
+        /* ═══════════════════════════════════════════════════
+           DUCKED.DEV — Frontend Controller
+           ═══════════════════════════════════════════════════ */
+
+        const API = `${location.protocol}//${location.host}`;
+        const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+        let ws = null;
+        let sessionId = null;
+        let countdownInterval = null;
+        let buildStartTime = null;
+        let runStartTime = null;
+        let ttl = 60; // seconds — matches config
+
+        // ── Log buffer (shared across states) ───────────────
+        let logLines = [];
+
+        // ── Global DOM Elements ──────────────────────────────
+        const repoInput = document.getElementById('repo-input');
+        const errorEl = document.getElementById('deploy-error');
+
+        // ── State Machine ───────────────────────────────────
+
+        function switchState(name) {
+            document.querySelectorAll('.state').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(`state-${name}`);
+            if (target) target.classList.add('active');
+        }
+
+        // ── Deploy ──────────────────────────────────────────
+
+        async function deploy() {
+            const repoUrl = repoInput.value.trim();
+            if (!repoUrl) return;
+
+            // Watcher reacts
+            watcherState = 'deploying';
+            watcher.classList.remove('focus');
+            watcher.classList.add('deploying');
+            watcherPupils.forEach(p => {
+                p.style.transform = `translate(-50%, -50%)`;
+            });
+
+            // UI updates
+            const btn = document.getElementById('btn-deploy');
+            errorEl.style.display = 'none';
+
+            btn.disabled = true;
+            btn.textContent = 'Deploying...';
+
+            try {
+                const resp = await fetch(`${API}/api/deploy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_url: repoUrl }),
+                });
+
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    throw new Error(data.detail || `HTTP ${resp.status}`);
+                }
+
+                const data = await resp.json();
+                sessionId = data.session_id;
+                buildStartTime = Date.now();
+
+                // Reset state
+                logLines = [];
+                document.getElementById('terminal-build').innerHTML = '';
+                document.getElementById('terminal-session-id').textContent = sessionId;
+                resetPhaseBar();
+
+                // Switch to building view
+                switchState('building');
+
+                // Connect WebSocket
+                connectWS(sessionId);
+
+            } catch (e) {
+                errorEl.textContent = e.message;
+                errorEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Launch';
+                watcherState = 'idle';
+                watcher.classList.remove('deploying');
+            }
+        }
+
+        // ── Watcher Interactions ────────────────────────────
+        const watcher = document.getElementById('watcher');
+        const watcherPupils = document.querySelectorAll('.watcher-pupil');
+        let watcherState = 'idle'; // idle, focused, deploying
+
+        document.addEventListener('mousemove', (e) => {
+            if (watcherState !== 'idle') return;
+
+            const eyes = document.querySelectorAll('.watcher-eye');
+            eyes.forEach((eye, index) => {
+                const rect = eye.getBoundingClientRect();
+                const ex = rect.left + rect.width / 2;
+                const ey = rect.top + rect.height / 2;
+
+                const rad = Math.atan2(e.clientY - ey, e.clientX - ex);
+
+                // Constrain distance to keep pupil inside eye (max ~3.5px)
+                const distance = Math.min(3.5, Math.hypot(e.clientX - ex, e.clientY - ey) / 25);
+
+                const tx = Math.cos(rad) * distance;
+                const ty = Math.sin(rad) * distance;
+
+                watcherPupils[index].style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
+            });
+        });
+
+        repoInput.addEventListener('focus', () => {
+            if (watcherState === 'deploying') return;
+            watcherState = 'focused';
+            watcher.classList.add('focus');
+            // Lock eyes down towards the input
+            watcherPupils.forEach(p => {
+                p.style.transform = `translate(-50%, calc(-50% + 3.5px))`;
+            });
+        });
+
+        repoInput.addEventListener('blur', () => {
+            if (watcherState === 'deploying') return;
+            watcherState = 'idle';
+            watcher.classList.remove('focus');
+            watcherPupils.forEach(p => {
+                p.style.transform = `translate(-50%, -50%)`;
+            });
+        });
+
+        // ── API Interactions ──────────────────────────────────
+
+        function connectWS(sid) {
+            ws = new WebSocket(`${WS_PROTO}//${location.host}/api/sessions/${sid}/ws`);
+
+            ws.onmessage = (e) => {
+                const event = JSON.parse(e.data);
+                handleEvent(event);
+            };
+
+            ws.onerror = () => {
+                appendLog('Connection error.', 'error');
+            };
+
+            ws.onclose = () => {
+                ws = null;
+            };
+        }
+
+        function handleEvent(event) {
+            switch (event.type) {
+                case 'status':
+                    // Backend sends {type: "status", status: "<value>"}, not {type: "phase", phase: "<value>"}.
+                    handlePhase({ ...event, phase: event.status });
+                    break;
+                case 'build_log':
+                    appendLog(event.data, 'log');
+                    break;
+                case 'error':
+                    appendLog(`ERROR: ${event.data}`, 'error');
+                    handleError(event);
+                    break;
+            }
+        }
+
+        // ── Phase Handling ──────────────────────────────────
+
+        function handlePhase(event) {
+            const phase = event.phase;
+
+            switch (phase) {
+                case 'cloning':
+                    setActivePhase('clone');
+                    appendLog('>>> CLONING — Fetching the specimen...', 'phase');
+                    break;
+
+                case 'cloned':
+                    appendLog('>>> Clone complete.', 'phase');
+                    break;
+
+                case 'detecting':
+                    setActivePhase('detect');
+                    appendLog('>>> DETECTING — Analyzing the subject...', 'phase');
+                    break;
+
+                case 'detected':
+                    appendLog(`>>> Detected: ${event.data}`, 'phase');
+                    break;
+
+                case 'building':
+                    setActivePhase('build');
+                    appendLog('>>> BUILDING — Assembling the container...', 'phase');
+                    break;
+
+                case 'built':
+                    appendLog('>>> Build complete.', 'phase');
+                    break;
+
+                case 'running':
+                    setActivePhase('run');
+                    appendLog(`>>> LIVE — Preview: ${event.preview_url}`, 'phase');
+                    enterRunningState(event);
+                    break;
+
+                case 'failed':
+                    appendLog(`>>> FAILED: ${event.error}`, 'error');
+                    handleError(event);
+                    break;
+
+                case 'destroyed':
+                    enterDestroyedState();
+                    break;
+            }
+        }
+
+        // ── Phase Bar ───────────────────────────────────────
+
+        function resetPhaseBar() {
+            ['clone', 'detect', 'build', 'run'].forEach(p => {
+                const el = document.getElementById(`phase-${p}`);
+                if (el) el.classList.remove('active', 'done');
+            });
+            const ind = document.getElementById('phase-indicator');
+            if (ind) ind.style.opacity = '0';
+        }
+
+        function setActivePhase(name) {
+            const order = ['clone', 'detect', 'build', 'run'];
+            const idx = order.indexOf(name);
+            const indicator = document.getElementById('phase-indicator');
+
+            order.forEach((p, i) => {
+                const el = document.getElementById(`phase-${p}`);
+                if (!el) return;
+                el.classList.remove('active', 'done');
+                if (i < idx) el.classList.add('done');
+                if (i === idx) {
+                    el.classList.add('active');
+                    if (indicator) {
+                        indicator.style.opacity = '1';
+                        indicator.style.left = `${el.offsetLeft}px`;
+                        indicator.style.width = `${el.offsetWidth}px`;
+
+                        let color = 'var(--text-primary)';
+                        if (p === 'clone') color = 'var(--phase-clone)';
+                        if (p === 'build') color = 'var(--phase-build)';
+                        if (p === 'run') color = 'var(--phase-run)';
+
+                        indicator.style.backgroundColor = color;
+                        indicator.style.boxShadow = `0 0 10px ${color}`;
+                    }
+                }
+            });
+        }
+
+        // ── Terminal Logging ────────────────────────────────
+
+        function appendLog(text, type = 'log') {
+            logLines.push({ text, type });
+
+            // Append to build terminal
+            const buildTerm = document.getElementById('terminal-build');
+            if (buildTerm) appendToTerminal(buildTerm, text, type);
+
+            // Also append to running terminal if visible
+            const runTerm = document.getElementById('terminal-running');
+            if (runTerm) appendToTerminal(runTerm, text, type);
+        }
+
+        function appendToTerminal(terminal, text, type) {
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            if (type === 'phase') line.classList.add('log-phase');
+            if (type === 'error') line.classList.add('log-error');
+            if (type === 'muted') line.classList.add('log-muted');
+            line.textContent = text;
+            terminal.appendChild(line);
+
+            // Auto-scroll
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function populateTerminal(terminal) {
+            terminal.innerHTML = '';
+            logLines.forEach(({ text, type }) => {
+                appendToTerminal(terminal, text, type);
+            });
+        }
+
+        // ── Running State ───────────────────────────────────
+
+        function enterRunningState(event) {
+            // Populate the running terminal with existing logs
+            const runTerm = document.getElementById('terminal-running');
+            populateTerminal(runTerm);
+
+            // Load preview iframe
+            const previewUrl = event.preview_url || `/preview/${sessionId}`;
+            const frame = document.getElementById('preview-frame');
+            const loading = document.getElementById('preview-loading');
+
+            // Preview is served by Traefik on port 80, not by FastAPI on 9000
+            frame.src = `${location.protocol}//${location.hostname}${previewUrl}/`;
+            frame.onload = () => {
+                loading.style.display = 'none';
+                frame.style.display = 'block';
+            };
+
+            // Start countdown
+            runStartTime = Date.now();
+            startCountdown();
+
+            // Switch view
+            switchState('running');
+        }
+
+        function startCountdown() {
+            const bar = document.getElementById('countdown-bar');
+            const timerEl = document.getElementById('countdown-timer');
+            const statusEl = document.getElementById('countdown-status');
+
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                const elapsed = (Date.now() - runStartTime) / 1000;
+                const remaining = Math.max(0, ttl - elapsed);
+                const pct = (remaining / ttl) * 100;
+
+                bar.style.width = `${pct}%`;
+                timerEl.textContent = `${Math.ceil(remaining)}s remaining`;
+
+                if (remaining <= 3) {
+                    bar.classList.add('critical');
+                    statusEl.classList.add('critical');
+                }
+
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    timerEl.textContent = '0s';
+                }
+            }, 100);
+        }
+
+        // ── Destroyed State ─────────────────────────────────
+
+        function enterDestroyedState() {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            // Calculate stats
+            const totalTime = buildStartTime ? ((Date.now() - buildStartTime) / 1000).toFixed(1) : '—';
+            const liveTime = runStartTime ? ((Date.now() - runStartTime) / 1000).toFixed(1) : '—';
+            const buildTime = (buildStartTime && runStartTime)
+                ? ((runStartTime - buildStartTime) / 1000).toFixed(1) : '—';
+
+            document.getElementById('stat-lived').textContent = `Lived: ${liveTime}s`;
+            document.getElementById('stat-built').textContent = `Built in: ${buildTime}s`;
+
+            // Populate archive terminal
+            const archiveTerm = document.getElementById('terminal-archive');
+            populateTerminal(archiveTerm);
+
+            switchState('destroyed');
+        }
+
+        // ── Error State ─────────────────────────────────────
+
+        function handleError(event) {
+            enterDestroyedState();
+            document.querySelector('.death-message h2').textContent = 'Pipeline failed.';
+            document.querySelector('.death-message p').textContent = 'Even ducks have bad days.';
+        }
+
+        // ── Reset ───────────────────────────────────────────
+
+        function reset() {
+            if (ws) { ws.close(); ws = null; }
+            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+
+            sessionId = null;
+            buildStartTime = null;
+            runStartTime = null;
+            logLines = [];
+
+            // Reset UI elements
+            document.getElementById('repo-input').value = '';
+            document.getElementById('btn-deploy').disabled = false;
+            document.getElementById('btn-deploy').textContent = 'Deploy';
+            document.getElementById('deploy-error').style.display = 'none';
+            document.getElementById('terminal-build').innerHTML = '';
+            document.getElementById('terminal-running').innerHTML = '';
+            document.getElementById('terminal-archive').innerHTML = '';
+            document.getElementById('preview-frame').src = '';
+            document.getElementById('preview-frame').style.display = 'none';
+            document.getElementById('preview-loading').style.display = 'flex';
+            document.getElementById('countdown-bar').style.width = '100%';
+            document.getElementById('countdown-bar').classList.remove('critical');
+            document.getElementById('countdown-status').classList.remove('critical');
+            document.getElementById('countdown-status').innerHTML = '<span>● Container alive</span>';
+
+            // Reset Watcher State
+            watcherState = 'idle';
+            if (watcher) {
+                watcher.classList.remove('focus', 'deploying');
+                watcherPupils.forEach(p => p.style.transform = `translate(-50%, -50%)`);
+            }
+
+            // Reset death message
+            document.querySelector('.death-message h2').textContent = 'Session terminated.';
+            document.querySelector('.death-message p').textContent = 'Zero traces remain. Quack.';
+
+            resetPhaseBar();
+            switchState('idle');
+        }
+
+        // ── Enter key support ───────────────────────────────
+        document.getElementById('repo-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') deploy();
+        });
+
+    </script>
+</body>
+
+</html>

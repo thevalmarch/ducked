@@ -1,0 +1,14 @@
+.git
+.github
+.gitignore
+.vscode
+.idea
+__pycache__
+*.pyc
+*.pyo
+node_modules
+.npm
+.env
+.env.*
+*.md
+LICENSE
