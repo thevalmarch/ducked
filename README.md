@@ -122,7 +122,7 @@ make dev
 # or: cd backend && python main.py
 ```
 
-The engine starts at `http://localhost:9000`. Open it in your browser, paste a GitHub URL, and watch.
+The engine starts at `http://localhost:9000` (port can be changed via `.env`). Open it in your browser, paste a GitHub URL (currently only GitHub is supported), and watch.
 
 > **Note:** The Live Preview panel requires HTTPS with a real domain (see [Production Deployment](#production-deployment)). On localhost, builds run correctly but the preview iframe will not load.
 
@@ -234,6 +234,10 @@ Ducked is not Vercel. Ducked is not Heroku. Those platforms keep code alive. Duc
 That's not a bug. That's the feature.
 
 ---
+
+## Roadmap
+
+- [ ] Support for self-hosted Git instances (Forgejo, GitLab, Gitea)
 
 ## Contributing
 

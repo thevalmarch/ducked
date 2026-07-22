@@ -3,6 +3,7 @@ Ducked Engine — Configuration
 The Constrained Canvas: Every limit, every boundary, defined here.
 """
 from dataclasses import dataclass
+import os
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,7 @@ class Settings:
 
     # ── API Server ─────────────────────────────────────────────────
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 9000
+    API_PORT: int = int(os.getenv("API_PORT", "9000"))
 
     # ── Monitoring ─────────────────────────────────────────────────
     DISCORD_WEBHOOK_URL: str | None = None  # Set via environment variable in prod
