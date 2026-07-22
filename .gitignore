@@ -27,6 +27,7 @@ Thumbs.db
 # ── Environment Variables ───────────────────────
 .env
 .env.*
+!.env.example
 
 # ── Docker ──────────────────────────────────────
 # Don't ignore docker-compose.yml — it's part of the project
@@ -36,3 +37,7 @@ Thumbs.db
 tmp/
 .pytest_cache/
 ducked_*/
+test_malicious_repo/
+
+# ── Traefik / TLS ───────────────────────────────
+letsencrypt/
