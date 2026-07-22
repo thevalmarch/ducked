@@ -22,16 +22,16 @@ Ducked is an ephemeral code execution platform that clones any public GitHub rep
 User submits GitHub URL
         │
         ▼
-   ┌─────────┐     ┌──────────┐     ┌──────────┐     ┌─────────┐
-   │  Clone   │────▶│  Detect  │────▶│  Build   │────▶│  Run    │
-   │ (git)    │     │(heuristic)│    │ (docker) │     │ (live!) │
-   └─────────┘     └──────────┘     └──────────┘     └────┬────┘
-                                                          │ 60s
-                                                          ▼
-                                                    ┌──────────┐
-                                                    │ DESTROY  │
-                                                    │ (reaper) │
-                                                    └──────────┘
+   ┌─────────┐     ┌───────────┐     ┌──────────┐     ┌─────────┐
+   │  Clone  │────▶│  Detect   │────▶│  Build   │────▶│   Run   │
+   │  (git)  │     │(heuristic)│     │ (docker) │     │ (live!) │
+   └─────────┘     └───────────┘     └──────────┘     └────┬────┘
+                                                            │ 60s
+                                                            ▼
+                                                     ┌──────────┐
+                                                     │ DESTROY  │
+                                                     │ (reaper) │
+                                                     └──────────┘
 ```
 
 1. **Clone** — Shallow clone (`--depth 1`) of the target repository.
