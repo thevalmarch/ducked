@@ -124,6 +124,8 @@ make dev
 
 The engine starts at `http://localhost:9000`. Open it in your browser, paste a GitHub URL, and watch.
 
+> **Note:** The Live Preview panel requires HTTPS with a real domain (see [Production Deployment](#production-deployment)). On localhost, builds run correctly but the preview iframe will not load.
+
 ---
 
 ## Environment Variables
