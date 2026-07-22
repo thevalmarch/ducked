@@ -6,7 +6,7 @@
 
 If you discover a security vulnerability in Ducked, please report it responsibly:
 
-1. **Email**: Send a detailed report to **[ducked@proton.me](mailto:ducked@proton.me)**
+1. **Email**: Send a detailed report to **[thevalmarch@gmail.com](mailto:thevalmarch@gmail.com)**
 2. **Subject line**: `[SECURITY] Brief description of the vulnerability`
 3. **Include**:
    - Description of the vulnerability

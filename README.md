@@ -130,7 +130,7 @@ The engine starts at `http://localhost:9000`. Open it in your browser, paste a G
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DISCORD_WEBHOOK_URL` | `None` | Discord webhook for operational alerts |
-| `ACME_EMAIL` | `admin@ducked.dev` | Email for Let's Encrypt certificates (Traefik) |
+| `ACME_EMAIL` | `thevalmarch@gmail.com` | Email for Let's Encrypt certificates (Traefik) |
 
 See [`.env.example`](.env.example) for a ready-to-use template.
 
