@@ -14,9 +14,6 @@
 
 Ducked is an ephemeral code execution platform that clones any public GitHub repository, builds it inside an isolated Docker container with brutal resource constraints, lets it live for exactly **60 seconds**, then destroys everything — container, image, and cloned files. Zero traces remain.
 
-<!-- Add a screenshot or demo GIF here when available -->
-<!-- ![Ducked Demo](docs/demo.gif) -->
-
 ---
 
 ## How It Works
