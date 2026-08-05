@@ -13,13 +13,6 @@
     gap: 2rem;
 }
 
-/* NOTE: .logo has no matching element in index.html (dead rule). */
-.logo {
-    font-size: 3.5rem;
-    line-height: 1;
-    user-select: none;
-}
-
 .brand {
     text-align: center;
 }
@@ -213,12 +206,6 @@
     min-height: 100vh;
     padding: 2rem;
     gap: 2rem;
-}
-
-/* NOTE: .death-icon has no matching element in index.html (dead rule). */
-.death-icon {
-    font-size: 3rem;
-    opacity: 0.8;
 }
 
 .death-message {

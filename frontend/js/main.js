@@ -56,7 +56,7 @@ async function deploy() {
         errorEl.textContent = e.message;
         errorEl.style.display = 'block';
         btn.disabled = false;
-        btn.textContent = 'Launch';
+        btn.textContent = 'Deploy';
         setWatcherState('idle');
     }
 }
@@ -163,7 +163,6 @@ function enterDestroyedState() {
 
     // Calculate stats
     const { buildStartTime, runStartTime } = session;
-    const totalTime = buildStartTime ? ((Date.now() - buildStartTime) / 1000).toFixed(1) : '—';
     const liveTime = runStartTime ? ((Date.now() - runStartTime) / 1000).toFixed(1) : '—';
     const buildTime = (buildStartTime && runStartTime)
         ? ((runStartTime - buildStartTime) / 1000).toFixed(1) : '—';
