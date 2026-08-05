@@ -2,18 +2,18 @@
    DUCKED.DEV — Frontend Controller
    ═══════════════════════════════════════════════════ */
 
+import { resetPhaseBar, setActivePhase } from './components/phaseBar.js';
+import { appendLog, populateTerminal, clearLogs } from './components/terminal.js';
+import { startCountdown, stopCountdown } from './components/countdown.js';
+
 const API = `${location.protocol}//${location.host}`;
 const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
 let ws = null;
 let sessionId = null;
-let countdownInterval = null;
 let buildStartTime = null;
 let runStartTime = null;
 let ttl = 60; // seconds — matches config
-
-// ── Log buffer (shared across states) ───────────────
-let logLines = [];
 
 // ── Global DOM Elements ──────────────────────────────
 const repoInput = document.getElementById('repo-input');
@@ -65,7 +65,7 @@ async function deploy() {
         buildStartTime = Date.now();
 
         // Reset state
-        logLines = [];
+        clearLogs();
         document.getElementById('terminal-build').innerHTML = '';
         document.getElementById('terminal-session-id').textContent = sessionId;
         resetPhaseBar();
@@ -216,80 +216,6 @@ function handlePhase(event) {
     }
 }
 
-// ── Phase Bar ───────────────────────────────────────
-
-function resetPhaseBar() {
-    ['clone', 'detect', 'build', 'run'].forEach(p => {
-        const el = document.getElementById(`phase-${p}`);
-        if (el) el.classList.remove('active', 'done');
-    });
-    const ind = document.getElementById('phase-indicator');
-    if (ind) ind.style.opacity = '0';
-}
-
-function setActivePhase(name) {
-    const order = ['clone', 'detect', 'build', 'run'];
-    const idx = order.indexOf(name);
-    const indicator = document.getElementById('phase-indicator');
-
-    order.forEach((p, i) => {
-        const el = document.getElementById(`phase-${p}`);
-        if (!el) return;
-        el.classList.remove('active', 'done');
-        if (i < idx) el.classList.add('done');
-        if (i === idx) {
-            el.classList.add('active');
-            if (indicator) {
-                indicator.style.opacity = '1';
-                indicator.style.left = `${el.offsetLeft}px`;
-                indicator.style.width = `${el.offsetWidth}px`;
-
-                let color = 'var(--text-primary)';
-                if (p === 'clone') color = 'var(--phase-clone)';
-                if (p === 'build') color = 'var(--phase-build)';
-                if (p === 'run') color = 'var(--phase-run)';
-
-                indicator.style.backgroundColor = color;
-                indicator.style.boxShadow = `0 0 10px ${color}`;
-            }
-        }
-    });
-}
-
-// ── Terminal Logging ────────────────────────────────
-
-function appendLog(text, type = 'log') {
-    logLines.push({ text, type });
-
-    // Append to build terminal
-    const buildTerm = document.getElementById('terminal-build');
-    if (buildTerm) appendToTerminal(buildTerm, text, type);
-
-    // Also append to running terminal if visible
-    const runTerm = document.getElementById('terminal-running');
-    if (runTerm) appendToTerminal(runTerm, text, type);
-}
-
-function appendToTerminal(terminal, text, type) {
-    const line = document.createElement('div');
-    line.className = 'log-line';
-    if (type === 'phase') line.classList.add('log-phase');
-    if (type === 'error') line.classList.add('log-error');
-    if (type === 'muted') line.classList.add('log-muted');
-    line.textContent = text;
-    terminal.appendChild(line);
-
-    // Auto-scroll
-    terminal.scrollTop = terminal.scrollHeight;
-}
-
-function populateTerminal(terminal) {
-    terminal.innerHTML = '';
-    logLines.forEach(({ text, type }) => {
-        appendToTerminal(terminal, text, type);
-    });
-}
-
 // ── Running State ───────────────────────────────────
 
 function enterRunningState(event) {
@@ -311,47 +237,16 @@ function enterRunningState(event) {
 
     // Start countdown
     runStartTime = Date.now();
-    startCountdown();
+    startCountdown(runStartTime, ttl);
 
     // Switch view
     switchState('running');
 }
 
-function startCountdown() {
-    const bar = document.getElementById('countdown-bar');
-    const timerEl = document.getElementById('countdown-timer');
-    const statusEl = document.getElementById('countdown-status');
-
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    countdownInterval = setInterval(() => {
-        const elapsed = (Date.now() - runStartTime) / 1000;
-        const remaining = Math.max(0, ttl - elapsed);
-        const pct = (remaining / ttl) * 100;
-
-        bar.style.width = `${pct}%`;
-        timerEl.textContent = `${Math.ceil(remaining)}s remaining`;
-
-        if (remaining <= 3) {
-            bar.classList.add('critical');
-            statusEl.classList.add('critical');
-        }
-
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
-            timerEl.textContent = '0s';
-        }
-    }, 100);
-}
-
 // ── Destroyed State ─────────────────────────────────
 
 function enterDestroyedState() {
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-    }
+    stopCountdown();
 
     // Calculate stats
     const totalTime = buildStartTime ? ((Date.now() - buildStartTime) / 1000).toFixed(1) : '—';
@@ -381,12 +276,12 @@ function handleError(event) {
 
 function reset() {
     if (ws) { ws.close(); ws = null; }
-    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    stopCountdown();
 
     sessionId = null;
     buildStartTime = null;
     runStartTime = null;
-    logLines = [];
+    clearLogs();
 
     // Reset UI elements
     document.getElementById('repo-input').value = '';
