@@ -198,7 +198,16 @@ Without these, the engine works but is only reachable locally and isn't hardened
 
 ```
 frontend/
-  index.html          # Single-page app (vanilla HTML/CSS/JS)
+  index.html          # Markup + the watcher-face template
+  css/                # tokens, base, watcher, terminal, phase-bar, states, responsive
+  js/
+    main.js           # Controller: deploy, event dispatch, state entry, wiring
+    config.js         # API base, WS protocol, TTL
+    store.js          # Session state
+    api.js            # POST /api/deploy
+    socket.js         # WebSocket lifecycle
+    router.js         # Which state section is visible
+    components/       # watcher, terminal, countdown, phaseBar
 
 backend/
   main.py             # FastAPI orchestrator + Reaper loop
@@ -237,7 +246,8 @@ That's not a bug. That's the feature.
 
 ## Roadmap
 
-- [ ] Component-based frontend architecture (split the single-file SPA into ES modules)
+- [x] Component-based frontend architecture (split the single-file SPA into ES modules)
+- [ ] Serve the session TTL from the API instead of hardcoding it in the frontend
 - [ ] Support for self-hosted Git instances (Forgejo, GitLab, Gitea)
 
 See [ROADMAP.md](ROADMAP.md) for the full plan and rationale.

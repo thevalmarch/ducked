@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Frontend architecture**: split the single 1,249-line `index.html` into separate stylesheets and ES modules. `index.html` is now 137 lines of markup; CSS lives in `frontend/css/`, JavaScript in `frontend/js/` with per-concern modules (config, store, api, socket, router) and components (watcher, terminal, countdown, phaseBar). No build step, no new dependencies, no backend changes — behavior-preserving.
+- Inline `onclick` attributes replaced with `addEventListener` bindings, required because ES modules do not share global scope.
+- The watcher's face is now defined once in a `<template>` and cloned into the idle and destroyed states rather than duplicated in markup.
+
 ## [0.1.0] — 2026-07-22
 
 ### Added

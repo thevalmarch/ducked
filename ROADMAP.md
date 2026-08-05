@@ -10,64 +10,77 @@ Nothing here is a promise. Things that stop making sense get deleted, not shippe
 
 ### Component-based frontend architecture
 
-**Status:** Planned
+**Status:** Done
 **Scope:** `frontend/`
 
-The frontend is currently a single 1,249-line `frontend/index.html` with inline
-`<style>` and `<script>` blocks — roughly 690 lines of CSS, 115 lines of markup,
-and 427 lines of JavaScript in one file. It works, but it has hit the point where
-the four UI states (idle → building → running → destroyed) are difficult to edit
-in isolation, and the CSS has no enforced boundaries between them.
+`frontend/index.html` was a single 1,249-line file with inline `<style>` and
+`<script>` blocks — roughly 690 lines of CSS, 115 of markup, and 427 of
+JavaScript. It is now 137 lines of markup, with the rest split into stylesheets
+and ES modules.
 
-The plan is to split it into ES modules and separate stylesheets — **no build
-step, no `package.json`, no `node_modules`**. Ducked is a Python project whose
-whole premise is minimalism; adding an npm toolchain to serve one page would cost
-more than it returns. Native ES modules and plain CSS give the file boundaries
-without the pipeline.
+No build step, no `package.json`, no `node_modules`. Ducked is a Python project
+whose whole premise is minimalism; an npm toolchain to serve one page would cost
+more than it returns. Native ES modules and plain CSS gave the file boundaries
+without the pipeline. No backend change was needed either — `main.py` already
+mounts `/static` → `../frontend`, so `/static/css/…` and `/static/js/…` resolve
+against the existing route.
 
-Target layout:
+Shipped layout:
 
 ```
 frontend/
-  index.html          # markup only — no inline style or script
+  index.html          # markup + the #watcher-face template
   css/
-    tokens.css        # colors, spacing, fonts (single source of truth)
-    base.css          # reset, layout primitives, shared .state rules
+    tokens.css        # :root custom properties
+    base.css          # reset, body, .state visibility, .btn-deploy
     watcher.css       # the duck, its states, the zzz animation
-    terminal.css      # terminal + log line styling (shared by 3 states)
+    terminal.css      # log surface, shared by three states
     phase-bar.css     # clone/detect/build/run indicator
-    states.css        # per-state layout (idle, building, running, destroyed)
-    responsive.css    # breakpoints
+    states.css        # per-state layout
+    responsive.css    # breakpoints, loaded last
   js/
-    main.js           # entry point, wires DOM events
+    main.js           # controller: deploy, dispatch, state entry, wiring
     config.js         # API base, WS protocol, TTL
-    store.js          # session state + log buffer
-    api.js            # fetch wrappers for /api/deploy etc.
-    socket.js         # WebSocket lifecycle + event dispatch
-    router.js         # switchState() — the state machine
+    store.js          # session state
+    api.js            # deployRepo()
+    socket.js         # connectWS / closeSocket
+    router.js         # switchState()
     components/
       watcher.js      # eye tracking, focus/deploy/sleep states
       phaseBar.js     # phase transitions
-      terminal.js     # append/populate log lines
+      terminal.js     # log buffer + rendering
       countdown.js    # the 60s timer and bar
-      preview.js      # live preview iframe
 ```
 
-Notes and constraints:
+Where the result differed from the plan:
 
-- **No backend change is required.** `main.py` already mounts `/static` →
-  `../frontend`, so assets referenced as `/static/css/…` and `/static/js/…`
-  resolve without touching the FastAPI routes.
-- The inline `onclick="deploy()"` and `onclick="reset()"` handlers **must** move
-  to `addEventListener`. ES modules do not share global scope, so inline
-  attribute handlers silently stop resolving.
-- The hardcoded `ttl = 60` in the frontend duplicates `config.py`. Worth exposing
-  via `/api/health` or a config endpoint so the two cannot drift.
-- The watcher markup is duplicated between the idle and destroyed states — a
-  candidate for a single render function.
+- **No `preview.js`.** The live-preview iframe is a handful of lines inside
+  `enterRunningState()` and did not justify a module. Worth revisiting if the
+  preview grows a loading or error state.
+- **The log buffer lives in `terminal.js`, not `store.js`.** It is only ever read
+  to render a terminal, so nothing else needs it.
+- **`handleEvent` stayed in `main.js`** rather than moving into `socket.js`,
+  which keeps the socket module pure transport with no knowledge of what a
+  message means.
+- **`connectWS` takes `onEvent`/`onError` callbacks.** `ws.onerror` logged
+  directly rather than going through the dispatcher; routing it through the
+  dispatcher would have torn the session down on a transient socket hiccup.
 
-This refactor is explicitly **behavior-preserving**: no visual or functional
-change, no new dependencies.
+The refactor was behavior-preserving throughout: no visual change, no functional
+change, no new dependencies. The one required fix was moving the inline
+`onclick="deploy()"` and `onclick="reset()"` attributes to `addEventListener` —
+ES modules do not share global scope, so attribute handlers stop resolving.
+
+### Serve the session TTL from the API
+
+**Status:** Planned
+**Scope:** `frontend/js/config.js`, `backend/main.py`
+
+`TTL` in `config.js` hardcodes 60 seconds, duplicating `SESSION_TTL` in
+`backend/config.py`. If the backend value changes, the countdown drifts out of
+sync with the reaper and the UI lies about how long a container has left.
+Exposing it via `/api/health` or a small config endpoint would remove the
+duplication.
 
 ---
 
