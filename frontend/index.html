@@ -27,17 +27,7 @@
 
     <!-- ════════════ STATE 1: IDLE ════════════ -->
     <section id="state-idle" class="state active">
-        <div class="watcher" id="watcher">
-            <div class="watcher-eyes">
-                <div class="watcher-eye">
-                    <div class="watcher-pupil"></div>
-                </div>
-                <div class="watcher-eye">
-                    <div class="watcher-pupil"></div>
-                </div>
-            </div>
-            <div class="watcher-beak"></div>
-        </div>
+        <div class="watcher" id="watcher" data-watcher-face></div>
         <div class="brand">
             <h1>Ducked</h1>
             <p class="tagline">Paste a repo. Watch it live. Watch it die.</p>
@@ -107,19 +97,10 @@
 
     <!-- ════════════ STATE 4: DESTROYED ════════════ -->
     <section id="state-destroyed" class="state">
-        <div class="watcher sleeping">
+        <div class="watcher sleeping" data-watcher-face>
             <div class="zzz z1">Z</div>
             <div class="zzz z2">z</div>
             <div class="zzz z3">z</div>
-            <div class="watcher-eyes">
-                <div class="watcher-eye">
-                    <div class="watcher-pupil"></div>
-                </div>
-                <div class="watcher-eye">
-                    <div class="watcher-pupil"></div>
-                </div>
-            </div>
-            <div class="watcher-beak"></div>
         </div>
         <div class="death-message">
             <h2>Session terminated.</h2>
@@ -135,6 +116,21 @@
             <div class="terminal" id="terminal-archive"></div>
         </details>
     </section>
+
+    <!-- The watcher's face, cloned into every [data-watcher-face] host by
+         js/components/watcher.js. Defined once here rather than duplicated
+         in the idle and destroyed states. -->
+    <template id="watcher-face">
+        <div class="watcher-eyes">
+            <div class="watcher-eye">
+                <div class="watcher-pupil"></div>
+            </div>
+            <div class="watcher-eye">
+                <div class="watcher-pupil"></div>
+            </div>
+        </div>
+        <div class="watcher-beak"></div>
+    </template>
 
     <script type="module" src="/static/js/main.js"></script>
 </body>
