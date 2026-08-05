@@ -6,14 +6,11 @@ import { resetPhaseBar, setActivePhase } from './components/phaseBar.js';
 import { appendLog, populateTerminal, clearLogs } from './components/terminal.js';
 import { startCountdown, stopCountdown } from './components/countdown.js';
 import { initWatcher, setWatcherState } from './components/watcher.js';
+import { session, resetSession } from './store.js';
 
 const API = `${location.protocol}//${location.host}`;
 const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
-let ws = null;
-let sessionId = null;
-let buildStartTime = null;
-let runStartTime = null;
 let ttl = 60; // seconds — matches config
 
 // ── Global DOM Elements ──────────────────────────────
@@ -57,20 +54,20 @@ async function deploy() {
         }
 
         const data = await resp.json();
-        sessionId = data.session_id;
-        buildStartTime = Date.now();
+        session.sessionId = data.session_id;
+        session.buildStartTime = Date.now();
 
         // Reset state
         clearLogs();
         document.getElementById('terminal-build').innerHTML = '';
-        document.getElementById('terminal-session-id').textContent = sessionId;
+        document.getElementById('terminal-session-id').textContent = session.sessionId;
         resetPhaseBar();
 
         // Switch to building view
         switchState('building');
 
         // Connect WebSocket
-        connectWS(sessionId);
+        connectWS(session.sessionId);
 
     } catch (e) {
         errorEl.textContent = e.message;
@@ -84,19 +81,19 @@ async function deploy() {
 // ── API Interactions ──────────────────────────────────
 
 function connectWS(sid) {
-    ws = new WebSocket(`${WS_PROTO}//${location.host}/api/sessions/${sid}/ws`);
+    session.ws = new WebSocket(`${WS_PROTO}//${location.host}/api/sessions/${sid}/ws`);
 
-    ws.onmessage = (e) => {
+    session.ws.onmessage = (e) => {
         const event = JSON.parse(e.data);
         handleEvent(event);
     };
 
-    ws.onerror = () => {
+    session.ws.onerror = () => {
         appendLog('Connection error.', 'error');
     };
 
-    ws.onclose = () => {
-        ws = null;
+    session.ws.onclose = () => {
+        session.ws = null;
     };
 }
 
@@ -174,7 +171,7 @@ function enterRunningState(event) {
     populateTerminal(runTerm);
 
     // Load preview iframe
-    const previewUrl = event.preview_url || `/preview/${sessionId}`;
+    const previewUrl = event.preview_url || `/preview/${session.sessionId}`;
     const frame = document.getElementById('preview-frame');
     const loading = document.getElementById('preview-loading');
 
@@ -186,8 +183,8 @@ function enterRunningState(event) {
     };
 
     // Start countdown
-    runStartTime = Date.now();
-    startCountdown(runStartTime, ttl);
+    session.runStartTime = Date.now();
+    startCountdown(session.runStartTime, ttl);
 
     // Switch view
     switchState('running');
@@ -199,6 +196,7 @@ function enterDestroyedState() {
     stopCountdown();
 
     // Calculate stats
+    const { buildStartTime, runStartTime } = session;
     const totalTime = buildStartTime ? ((Date.now() - buildStartTime) / 1000).toFixed(1) : '—';
     const liveTime = runStartTime ? ((Date.now() - runStartTime) / 1000).toFixed(1) : '—';
     const buildTime = (buildStartTime && runStartTime)
@@ -225,12 +223,10 @@ function handleError(event) {
 // ── Reset ───────────────────────────────────────────
 
 function reset() {
-    if (ws) { ws.close(); ws = null; }
+    if (session.ws) session.ws.close();
     stopCountdown();
 
-    sessionId = null;
-    buildStartTime = null;
-    runStartTime = null;
+    resetSession();
     clearLogs();
 
     // Reset UI elements
