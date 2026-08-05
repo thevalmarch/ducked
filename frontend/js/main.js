@@ -5,6 +5,7 @@
 import { resetPhaseBar, setActivePhase } from './components/phaseBar.js';
 import { appendLog, populateTerminal, clearLogs } from './components/terminal.js';
 import { startCountdown, stopCountdown } from './components/countdown.js';
+import { initWatcher, setWatcherState } from './components/watcher.js';
 
 const API = `${location.protocol}//${location.host}`;
 const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -34,12 +35,7 @@ async function deploy() {
     if (!repoUrl) return;
 
     // Watcher reacts
-    watcherState = 'deploying';
-    watcher.classList.remove('focus');
-    watcher.classList.add('deploying');
-    watcherPupils.forEach(p => {
-        p.style.transform = `translate(-50%, -50%)`;
-    });
+    setWatcherState('deploying');
 
     // UI updates
     const btn = document.getElementById('btn-deploy');
@@ -81,55 +77,9 @@ async function deploy() {
         errorEl.style.display = 'block';
         btn.disabled = false;
         btn.textContent = 'Launch';
-        watcherState = 'idle';
-        watcher.classList.remove('deploying');
+        setWatcherState('idle');
     }
 }
-
-// ── Watcher Interactions ────────────────────────────
-const watcher = document.getElementById('watcher');
-const watcherPupils = document.querySelectorAll('.watcher-pupil');
-let watcherState = 'idle'; // idle, focused, deploying
-
-document.addEventListener('mousemove', (e) => {
-    if (watcherState !== 'idle') return;
-
-    const eyes = document.querySelectorAll('.watcher-eye');
-    eyes.forEach((eye, index) => {
-        const rect = eye.getBoundingClientRect();
-        const ex = rect.left + rect.width / 2;
-        const ey = rect.top + rect.height / 2;
-
-        const rad = Math.atan2(e.clientY - ey, e.clientX - ex);
-
-        // Constrain distance to keep pupil inside eye (max ~3.5px)
-        const distance = Math.min(3.5, Math.hypot(e.clientX - ex, e.clientY - ey) / 25);
-
-        const tx = Math.cos(rad) * distance;
-        const ty = Math.sin(rad) * distance;
-
-        watcherPupils[index].style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
-    });
-});
-
-repoInput.addEventListener('focus', () => {
-    if (watcherState === 'deploying') return;
-    watcherState = 'focused';
-    watcher.classList.add('focus');
-    // Lock eyes down towards the input
-    watcherPupils.forEach(p => {
-        p.style.transform = `translate(-50%, calc(-50% + 3.5px))`;
-    });
-});
-
-repoInput.addEventListener('blur', () => {
-    if (watcherState === 'deploying') return;
-    watcherState = 'idle';
-    watcher.classList.remove('focus');
-    watcherPupils.forEach(p => {
-        p.style.transform = `translate(-50%, -50%)`;
-    });
-});
 
 // ── API Interactions ──────────────────────────────────
 
@@ -300,11 +250,7 @@ function reset() {
     document.getElementById('countdown-status').innerHTML = '<span>● Container alive</span>';
 
     // Reset Watcher State
-    watcherState = 'idle';
-    if (watcher) {
-        watcher.classList.remove('focus', 'deploying');
-        watcherPupils.forEach(p => p.style.transform = `translate(-50%, -50%)`);
-    }
+    setWatcherState('idle');
 
     // Reset death message
     document.querySelector('.death-message h2').textContent = 'Session terminated.';
@@ -318,6 +264,8 @@ function reset() {
 // This file loads as <script type="module">, which does not share global
 // scope, so inline onclick="deploy()" attributes can no longer resolve
 // these functions. Every handler is bound here instead.
+
+initWatcher(repoInput);
 
 document.getElementById('btn-deploy').addEventListener('click', deploy);
 document.getElementById('btn-reset').addEventListener('click', reset);
