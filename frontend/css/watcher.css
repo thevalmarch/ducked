@@ -1,0 +1,188 @@
+/* ═══════════════════════════════════════════════════
+   WATCHER — the interactive duck (idle + destroyed)
+   ═══════════════════════════════════════════════════ */
+
+.watcher {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    /* head width */
+    height: 64px;
+    /* head height */
+    margin: 0 auto -25px auto;
+    /* negative margin to overcome flexbox gap and pull it tight */
+    background: #151515;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 30px 30px 20px 20px;
+    /* geometric head shape */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.03);
+    position: relative;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    z-index: 10;
+}
+
+.watcher-eyes {
+    display: flex;
+    gap: 12px;
+    margin-top: -6px;
+    /* positioned inside upper head */
+    margin-bottom: 8px;
+    z-index: 2;
+}
+
+.watcher-eye {
+    width: 14px;
+    height: 14px;
+    background: #000;
+    border: 2px solid #333;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.watcher-pupil {
+    width: 5px;
+    height: 5px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: background 0.3s, transform 0.1s;
+}
+
+.watcher-beak {
+    width: 26px;
+    height: 10px;
+    background: var(--accent);
+    /* flat orange beak */
+    border-radius: 6px 6px 12px 12px;
+    /* geometric beak shape */
+    transition: background 0.3s, width 0.3s, transform 0.3s, border-radius 0.3s;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Watcher States ───────────────────────────────── */
+.watcher.focus {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 2px 8px rgba(255, 255, 255, 0.06);
+}
+
+.watcher.focus .watcher-eye {
+    border-color: var(--text-primary);
+}
+
+.watcher.focus .watcher-pupil {
+    background: var(--accent);
+}
+
+.watcher.focus .watcher-beak {
+    transform: translateY(2px) scaleX(0.9);
+    /* slightly shifts down on focus */
+}
+
+.watcher.deploying {
+    border-color: var(--accent);
+    box-shadow: 0 0 30px rgba(249, 115, 22, 0.15), inset 0 1px 3px rgba(249, 115, 22, 0.3);
+}
+
+.watcher.deploying .watcher-eye {
+    border-color: var(--accent);
+    transform: scaleY(0.3);
+    /* squinting hard */
+}
+
+.watcher.deploying .watcher-pupil {
+    background: var(--accent);
+}
+
+.watcher.deploying .watcher-beak {
+    background: var(--accent-hover);
+    width: 32px;
+    /* opens/widens */
+    transform: translateY(3px);
+    border-radius: 10px;
+}
+
+.watcher.sleeping {
+    margin: 0 auto -25px auto;
+    border-color: rgba(255, 255, 255, 0.02);
+    box-shadow: none;
+    opacity: 0.5;
+}
+
+.watcher.sleeping .watcher-eye {
+    border: none;
+    border-top: 2px solid #444;
+    border-radius: 0;
+    height: 2px;
+    background: transparent;
+    transform: translateY(-2px);
+    /* Slightly move away from beak as requested earlier, but keep original style */
+}
+
+.watcher.sleeping .watcher-pupil {
+    opacity: 0;
+}
+
+.watcher.sleeping .watcher-beak {
+    background: var(--accent);
+    /* keep it orange but dim */
+    opacity: 0.6;
+    box-shadow: none;
+}
+
+/* ── Zzz Animation for sleeping watcher ───────────── */
+.zzz {
+    position: absolute;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+    opacity: 0;
+    top: -10px;
+    right: -10px;
+    animation: floatZ 3s infinite linear;
+}
+
+.z1 {
+    animation-delay: 0s;
+    font-size: 16px;
+    right: -15px;
+}
+
+.z2 {
+    animation-delay: 1s;
+    font-size: 12px;
+    right: 5px;
+}
+
+.z3 {
+    animation-delay: 2s;
+    font-size: 10px;
+    right: -5px;
+}
+
+@keyframes floatZ {
+    0% {
+        transform: translate(0, 0) scale(0.5);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 0.8;
+    }
+
+    80% {
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translate(15px, -30px) scale(1.2);
+        opacity: 0;
+    }
+}

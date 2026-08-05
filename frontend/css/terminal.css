@@ -1,0 +1,67 @@
+/* ═══════════════════════════════════════════════════
+   TERMINAL — log surface shared by the building,
+   running, and destroyed states
+   ═══════════════════════════════════════════════════ */
+
+.terminal-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.terminal-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.terminal {
+    flex: 1;
+    background: var(--bg-terminal);
+    padding: 1rem 1.5rem;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--text-terminal);
+}
+
+.terminal::-webkit-scrollbar {
+    width: 6px;
+}
+
+.terminal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.terminal::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+/* ── Log lines ────────────────────────────────────── */
+.log-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.log-phase {
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.log-error {
+    color: var(--error);
+}
+
+.log-muted {
+    color: var(--text-muted);
+}

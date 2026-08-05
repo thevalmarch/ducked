@@ -1,0 +1,74 @@
+/* ═══════════════════════════════════════════════════
+   PHASE BAR — clone → detect → build → run indicator
+   ═══════════════════════════════════════════════════ */
+
+.phase-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary);
+    position: relative;
+    /* for indicator */
+}
+
+.phase-indicator {
+    position: absolute;
+    bottom: -1px;
+    /* overlap border */
+    height: 2px;
+    border-radius: 2px;
+    background: var(--text-primary);
+    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s, box-shadow 0.4s;
+    left: 0;
+    width: 0;
+    opacity: 0;
+    z-index: 11;
+}
+
+.phase-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    transition: color 0.3s;
+    padding: 0.25rem 0;
+}
+
+.phase-step.done {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.phase-step.active {
+    color: var(--phase-build);
+}
+
+.phase-step.clone.active {
+    color: var(--phase-clone);
+}
+
+.phase-step.detect.active {
+    color: var(--text-primary);
+}
+
+.phase-step.build.active {
+    color: var(--phase-build);
+}
+
+.phase-step.run.active {
+    color: var(--phase-run);
+}
+
+.phase-connector {
+    width: 2rem;
+    height: 1px;
+    background: var(--border);
+}

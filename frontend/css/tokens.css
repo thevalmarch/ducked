@@ -1,0 +1,23 @@
+/* ═══════════════════════════════════════════════════
+   DESIGN TOKENS — single source of truth for color
+   ═══════════════════════════════════════════════════ */
+
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-surface: #141414;
+    --bg-terminal: #0d1117;
+    --border: #1e1e1e;
+    --border-glow: #2a2a2a;
+
+    --text-primary: #e0e0e0;
+    --text-muted: #666666;
+    --text-terminal: #c9d1d9;
+
+    --accent: #f97316;
+    --accent-hover: #fb923c;
+    --phase-clone: #fbbf24;
+    --phase-build: #3b82f6;
+    --phase-run: #22c55e;
+    --phase-dead: #ef4444;
+    --error: #ef4444;
+}

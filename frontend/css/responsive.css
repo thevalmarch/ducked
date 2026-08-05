@@ -1,0 +1,23 @@
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE — must load last so breakpoints win
+   ═══════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .split-view {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+
+    .split-view .panel:first-child {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .brand h1 {
+        font-size: 1.5rem;
+    }
+
+    .input-row {
+        flex-direction: column;
+    }
+}

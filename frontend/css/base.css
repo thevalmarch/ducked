@@ -1,0 +1,61 @@
+/* ═══════════════════════════════════════════════════
+   BASE — reset, document defaults, shared primitives
+   ═══════════════════════════════════════════════════ */
+
+/* ── Reset ────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ── State visibility ─────────────────────────────── */
+/* Exactly one .state carries .active at a time; see js/router.js */
+.state {
+    display: none;
+}
+
+.state.active {
+    display: flex;
+}
+
+/* ── Shared primitives ────────────────────────────── */
+/* .btn-deploy is used by both the idle and destroyed states. */
+.btn-deploy {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    white-space: nowrap;
+}
+
+.btn-deploy:hover {
+    background: var(--accent-hover);
+    transform: scale(1.02);
+}
+
+.btn-deploy:active {
+    transform: scale(0.98);
+}
+
+.btn-deploy:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
