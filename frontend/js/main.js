@@ -7,23 +7,14 @@ import { appendLog, populateTerminal, clearLogs } from './components/terminal.js
 import { startCountdown, stopCountdown } from './components/countdown.js';
 import { initWatcher, setWatcherState } from './components/watcher.js';
 import { session, resetSession } from './store.js';
-
-const API = `${location.protocol}//${location.host}`;
-const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
-
-let ttl = 60; // seconds — matches config
+import { TTL } from './config.js';
+import { deployRepo } from './api.js';
+import { connectWS, closeSocket } from './socket.js';
+import { switchState } from './router.js';
 
 // ── Global DOM Elements ──────────────────────────────
 const repoInput = document.getElementById('repo-input');
 const errorEl = document.getElementById('deploy-error');
-
-// ── State Machine ───────────────────────────────────
-
-function switchState(name) {
-    document.querySelectorAll('.state').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById(`state-${name}`);
-    if (target) target.classList.add('active');
-}
 
 // ── Deploy ──────────────────────────────────────────
 
@@ -42,18 +33,7 @@ async function deploy() {
     btn.textContent = 'Deploying...';
 
     try {
-        const resp = await fetch(`${API}/api/deploy`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ repo_url: repoUrl }),
-        });
-
-        if (!resp.ok) {
-            const data = await resp.json();
-            throw new Error(data.detail || `HTTP ${resp.status}`);
-        }
-
-        const data = await resp.json();
+        const data = await deployRepo(repoUrl);
         session.sessionId = data.session_id;
         session.buildStartTime = Date.now();
 
@@ -67,7 +47,10 @@ async function deploy() {
         switchState('building');
 
         // Connect WebSocket
-        connectWS(session.sessionId);
+        connectWS(session.sessionId, {
+            onEvent: handleEvent,
+            onError: () => appendLog('Connection error.', 'error'),
+        });
 
     } catch (e) {
         errorEl.textContent = e.message;
@@ -78,24 +61,7 @@ async function deploy() {
     }
 }
 
-// ── API Interactions ──────────────────────────────────
-
-function connectWS(sid) {
-    session.ws = new WebSocket(`${WS_PROTO}//${location.host}/api/sessions/${sid}/ws`);
-
-    session.ws.onmessage = (e) => {
-        const event = JSON.parse(e.data);
-        handleEvent(event);
-    };
-
-    session.ws.onerror = () => {
-        appendLog('Connection error.', 'error');
-    };
-
-    session.ws.onclose = () => {
-        session.ws = null;
-    };
-}
+// ── Event Dispatch ────────────────────────────────────
 
 function handleEvent(event) {
     switch (event.type) {
@@ -184,7 +150,7 @@ function enterRunningState(event) {
 
     // Start countdown
     session.runStartTime = Date.now();
-    startCountdown(session.runStartTime, ttl);
+    startCountdown(session.runStartTime, TTL);
 
     // Switch view
     switchState('running');
@@ -223,7 +189,7 @@ function handleError(event) {
 // ── Reset ───────────────────────────────────────────
 
 function reset() {
-    if (session.ws) session.ws.close();
+    closeSocket();
     stopCountdown();
 
     resetSession();
