@@ -7,7 +7,7 @@ import { appendLog, populateTerminal, clearLogs } from './components/terminal.js
 import { startCountdown, stopCountdown } from './components/countdown.js';
 import { initWatcher, setWatcherState } from './components/watcher.js';
 import { session, resetSession } from './store.js';
-import { TTL } from './config.js';
+import { TTL, loadConfig } from './config.js';
 import { deployRepo } from './api.js';
 import { connectWS, closeSocket } from './socket.js';
 import { switchState } from './router.js';
@@ -225,6 +225,16 @@ function reset() {
 // This file loads as <script type="module">, which does not share global
 // scope, so inline onclick="deploy()" attributes can no longer resolve
 // these functions. Every handler is bound here instead.
+
+// The markup ships 60s as a placeholder; correct it once the engine
+// reports its real TTL.
+loadConfig().then(() => {
+    const ttlLabel = document.getElementById('constraint-ttl');
+    if (ttlLabel) ttlLabel.textContent = `TTL: ${TTL}s`;
+
+    const timerEl = document.getElementById('countdown-timer');
+    if (timerEl) timerEl.textContent = `${TTL}s remaining`;
+});
 
 initWatcher(repoInput);
 

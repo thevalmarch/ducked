@@ -73,14 +73,16 @@ ES modules do not share global scope, so attribute handlers stop resolving.
 
 ### Serve the session TTL from the API
 
-**Status:** Planned
-**Scope:** `frontend/js/config.js`, `backend/main.py`
+**Status:** Done
+**Scope:** `frontend/js/config.js`, `frontend/js/main.js`
 
-`TTL` in `config.js` hardcodes 60 seconds, duplicating `SESSION_TTL` in
-`backend/config.py`. If the backend value changes, the countdown drifts out of
-sync with the reaper and the UI lies about how long a container has left.
-Exposing it via `/api/health` or a small config endpoint would remove the
-duplication.
+`config.js` used to hardcode 60 seconds, duplicating `CONTAINER_TTL_SECONDS` in
+`backend/config.py`. `loadConfig()` now reads the value from `/api/health` — which
+already reported it — at page load, so the countdown, the `TTL: 60s` constraint
+label, and the timer placeholder all follow the engine.
+
+The hardcoded 60 remains only as a fallback for when the engine is unreachable,
+which leaves behaviour unchanged from before. No backend change was needed.
 
 ---
 

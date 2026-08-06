@@ -247,7 +247,7 @@ That's not a bug. That's the feature.
 ## Roadmap
 
 - [x] Component-based frontend architecture (split the single-file SPA into ES modules)
-- [ ] Serve the session TTL from the API instead of hardcoding it in the frontend
+- [x] Serve the session TTL from the API instead of hardcoding it in the frontend
 - [ ] Support for self-hosted Git instances (Forgejo, GitLab, Gitea)
 
 See [ROADMAP.md](ROADMAP.md) for the full plan and rationale.

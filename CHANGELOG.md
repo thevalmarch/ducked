@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Session TTL served from the API**: the frontend reads `container_ttl_seconds` from `/api/health` at page load instead of hardcoding 60. The countdown, the TTL constraint label, and the timer placeholder now follow `CONTAINER_TTL_SECONDS`, so changing it in `backend/config.py` no longer leaves the UI lying about how long a container has left. Falls back to 60 if the engine is unreachable.
+
 ### Changed
 
 - **Frontend architecture**: split the single 1,249-line `index.html` into separate stylesheets and ES modules. `index.html` is now 137 lines of markup; CSS lives in `frontend/css/`, JavaScript in `frontend/js/` with per-concern modules (config, store, api, socket, router) and components (watcher, terminal, countdown, phaseBar). No build step, no new dependencies, no backend changes — behavior-preserving.
