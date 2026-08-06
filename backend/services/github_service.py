@@ -1,13 +1,17 @@
 """
-Ducked Engine — GitHub Service
+Ducked Engine — Git Service
 Clones repositories and identifies project types.
 Every incoming repo is an unknown entity to be analyzed before quarantine.
+
+Handles any forge in settings.ALLOWED_GIT_HOSTS — GitHub, GitLab, Gitea,
+Forgejo, and self-hosted instances. Only the pre-clone size check is
+forge-specific; cloning and detection are the same everywhere.
 """
 import os
-import re
 import shutil
 import subprocess
 import logging
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -22,21 +26,63 @@ class GitHubService:
 
     # ── Repo Size Enforcement ─────────────────────────────────────
 
-    def check_repo_size(self, repo_url: str) -> None:
+    @staticmethod
+    def parse_repo_url(repo_url: str) -> tuple[str, str, str]:
         """
-        Layer 1: Pre-clone size check via GitHub API.
-        Rejects repos larger than MAX_REPO_SIZE_MB before any clone attempt.
-        Gracefully degrades if the API is unreachable — Layer 2 catches it.
+        Split a validated repo URL into (host, owner_path, repo).
+
+        owner_path is everything before the final segment, so GitLab
+        subgroups survive: group/subgroup for .../group/subgroup/project.
         """
-        # Extract owner/repo from validated URL
-        match = re.match(
-            r"^https://github\.com/([^/]+)/([^/]+?)(?:\.git)?$", repo_url
-        )
-        if not match:
+        parts = urlsplit(repo_url)
+        segments = [s for s in parts.path.split("/") if s]
+        if len(segments) < 2:
             raise RuntimeError(f"Cannot parse owner/repo from URL: {repo_url}")
 
-        owner, repo = match.group(1), match.group(2)
-        api_url = f"https://api.github.com/repos/{owner}/{repo}"
+        repo = segments[-1]
+        if repo.endswith(".git"):
+            repo = repo[:-4]
+
+        return parts.netloc.lower(), "/".join(segments[:-1]), repo
+
+    def _size_api_url(self, host: str, owner_path: str, repo: str) -> str | None:
+        """
+        The API endpoint that reports repository size in KB, or None if we
+        do not know how to ask this forge.
+
+        GitHub has a dedicated API host. Gitea and Forgejo both expose
+        /api/v1/repos/{owner}/{repo} on the instance itself, which covers
+        Codeberg, gitea.com, and self-hosted instances.
+
+        GitLab is deliberately absent: repository size sits behind
+        ?statistics=true, which requires privileges a public reader does
+        not have. Those clones fall through to the post-clone disk check.
+        """
+        if host == "github.com":
+            return f"https://api.github.com/repos/{owner_path}/{repo}"
+
+        # Assume a Gitea-compatible API and treat a bad response as
+        # "unknown forge" rather than an error.
+        return f"https://{host}/api/v1/repos/{owner_path}/{repo}"
+
+    def check_repo_size(self, repo_url: str) -> None:
+        """
+        Layer 1: Pre-clone size check via the forge's API.
+        Rejects repos larger than MAX_REPO_SIZE_MB before any clone attempt.
+        Gracefully degrades if the API is unreachable or the forge is not
+        one we can query — Layer 2 (post-clone disk check) catches those,
+        bounded by CLONE_TIMEOUT_SECONDS.
+        """
+        host, owner_path, repo = self.parse_repo_url(repo_url)
+        is_github = host == "github.com"
+        api_url = self._size_api_url(host, owner_path, repo)
+
+        if api_url is None:
+            log.info(
+                f"No size API known for {host}. "
+                f"Relying on the post-clone disk check."
+            )
+            return
 
         try:
             # follow_redirects=False prevents SSRF via redirect to internal host
@@ -44,39 +90,51 @@ class GitHubService:
                 api_url,
                 timeout=10.0,
                 follow_redirects=False,
-                headers={"Accept": "application/vnd.github.v3+json"},
+                headers={"Accept": "application/json"},
             )
 
-            if resp.status_code == 301:
-                # Repo was renamed — check that redirect stays on api.github.com
+            if resp.status_code in (301, 302, 307, 308):
+                # Repo was renamed. Only follow if the redirect stays on the
+                # same host we already trusted.
                 location = resp.headers.get("location", "")
-                if not location.startswith("https://api.github.com/"):
+                expected = "https://api.github.com/" if is_github else f"https://{host}/"
+                if not location.startswith(expected):
                     raise RuntimeError(
-                        f"GitHub API redirected to unexpected host: {location}"
+                        f"{host} API redirected to unexpected host: {location}"
                     )
-                # Follow the single safe redirect
                 resp = httpx.get(
                     location,
                     timeout=10.0,
                     follow_redirects=False,
-                    headers={"Accept": "application/vnd.github.v3+json"},
+                    headers={"Accept": "application/json"},
                 )
 
-            if resp.status_code == 404:
+            if resp.status_code == 404 and is_github:
                 raise RuntimeError(
-                    f"Repository not found: {owner}/{repo}. "
+                    f"Repository not found: {owner_path}/{repo}. "
                     "Is it a public repository?"
                 )
 
             if resp.status_code != 200:
+                # For non-GitHub hosts this usually means the instance is not
+                # Gitea-compatible (GitLab, for one), not that the repo is
+                # missing. Let the clone be the judge.
                 log.warning(
-                    f"GitHub API returned {resp.status_code} for {owner}/{repo}. "
-                    f"Skipping pre-clone size check (Layer 2 will catch oversized repos)."
+                    f"{host} API returned {resp.status_code} for "
+                    f"{owner_path}/{repo}. Skipping pre-clone size check "
+                    f"(post-clone disk check will enforce limits)."
                 )
                 return
 
             data = resp.json()
-            size_kb = data.get("size", 0)
+            size_kb = data.get("size")
+            if not isinstance(size_kb, (int, float)):
+                log.warning(
+                    f"{host} API response for {owner_path}/{repo} has no usable "
+                    f"size field. Skipping pre-clone size check."
+                )
+                return
+
             size_mb = size_kb / 1024.0
 
             if size_mb > settings.MAX_REPO_SIZE_MB:
@@ -87,23 +145,30 @@ class GitHubService:
                 )
 
             log.info(
-                f"Pre-clone size check passed: {owner}/{repo} = {size_mb:.1f}MB "
-                f"(limit: {settings.MAX_REPO_SIZE_MB}MB)"
+                f"Pre-clone size check passed: {host}/{owner_path}/{repo} = "
+                f"{size_mb:.1f}MB (limit: {settings.MAX_REPO_SIZE_MB}MB)"
             )
 
         except httpx.HTTPError as e:
-            # API unreachable (rate limit, network issue, etc.)
-            # Let it through — Layer 2 (post-clone disk check) will catch it
+            # API unreachable (rate limit, network issue, non-existent host).
+            # Let it through — Layer 2 (post-clone disk check) will catch it.
             log.warning(
-                f"GitHub API check failed ({e}). "
+                f"{host} API check failed ({e}). "
                 f"Proceeding with clone — post-clone disk check will enforce limits."
+            )
+        except ValueError as e:
+            # Response was not JSON — almost certainly not a Gitea-style API.
+            log.warning(
+                f"{host} API returned a non-JSON response ({e}). "
+                f"Skipping pre-clone size check."
             )
 
     def check_clone_disk_usage(self, clone_dir: str) -> None:
         """
         Layer 2: Post-clone disk usage check.
         Measures actual directory size and aborts if it exceeds MAX_CLONE_DISK_MB.
-        This catches repos where the GitHub API size estimate was wrong.
+        This catches repos where the forge's size estimate was wrong, and is
+        the only size enforcement for forges we cannot query.
         """
         total_bytes = 0
         for dirpath, _dirnames, filenames in os.walk(clone_dir):
@@ -132,7 +197,7 @@ class GitHubService:
 
     def clone(self, repo_url: str, target_dir: str) -> None:
         """
-        Shallow clone a GitHub repository.
+        Shallow clone a repository from any allowlisted forge.
         --depth 1 + --single-branch: absolute minimum data transfer.
         We don't need commit history. We need the code. Nothing more.
         """

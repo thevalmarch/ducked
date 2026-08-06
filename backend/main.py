@@ -235,10 +235,10 @@ async def deploy_pipeline(session: Session) -> None:
     sid = session.session_id
 
     try:
-        # ── Pre-Clone: Repo size check (Layer 1 — GitHub API) ──
+        # ── Pre-Clone: Repo size check (Layer 1 — forge API) ──
         session.status = SessionStatus.CLONING
         session.broadcast({"type": "status", "status": "cloning"})
-        log.info(f"📦 [{sid}] Pre-clone size check via GitHub API...")
+        log.info(f"📦 [{sid}] Pre-clone size check via forge API...")
         await asyncio.to_thread(github_svc.check_repo_size, session.repo_url)
 
         # ── Phase 1: Clone ──
@@ -562,7 +562,7 @@ app.add_middleware(
 )
 async def deploy(request: Request, deploy_request: DeployRequest):
     """
-    Deploy a GitHub repository.
+    Deploy a repository from an allowlisted git forge.
     Clones, builds, and runs the project in an isolated container.
     Rate limited: 3/minute, 10/hour per IP (FIX 1).
     """

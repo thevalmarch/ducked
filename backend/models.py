@@ -8,6 +8,7 @@ from collections import deque
 from enum import Enum
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from config import settings
@@ -39,16 +40,32 @@ class SessionStatus(str, Enum):
 # ── API Schemas ────────────────────────────────────────────────────
 
 
+# Each path segment: 1-100 chars, must start alphanumeric. The leading
+# alphanumeric blocks "." and ".." outright, so no traversal can survive.
+_PATH_SEGMENT = re.compile(r"^[a-zA-Z0-9][\w.\-]{0,99}$")
+
+# GitLab allows nested subgroups (group/subgroup/project), so a path may
+# carry more than owner/repo. Capped to keep the surface small.
+MAX_PATH_SEGMENTS = 5
+
+
 class DeployRequest(BaseModel):
     model_config = ConfigDict(strict=False)
     repo_url: str
 
     @field_validator("repo_url")
     @classmethod
-    def validate_github_url(cls, v: str) -> str:
+    def validate_repo_url(cls, v: str) -> str:
+        """
+        Accept an HTTPS URL pointing at an allowlisted git forge.
+
+        The host allowlist (settings.ALLOWED_GIT_HOSTS) is the primary SSRF
+        defence. Everything else here narrows what can be smuggled through
+        a URL that *does* name an allowed host.
+        """
         cleaned = v.strip().rstrip("/")
 
-        # ── SSRF Prevention: reject dangerous schemes before regex ──
+        # ── SSRF Prevention: reject dangerous schemes before parsing ──
         lower = cleaned.lower()
         if lower.startswith("file://"):
             raise ValueError("file:// URLs are not allowed.")
@@ -58,17 +75,50 @@ class DeployRequest(BaseModel):
             raise ValueError("SSH URLs are not allowed. Use HTTPS.")
         if lower.startswith("http://"):
             raise ValueError("HTTP URLs are not allowed. Use HTTPS.")
-
-        # ── Strict GitHub HTTPS URL pattern ──
-        # Owner: 1-39 chars, must start with alphanumeric (blocks ".." and ".")
-        # Repo:  1-100 chars, must start with alphanumeric
-        # Optional .git suffix with escaped dot
-        pattern = r"^https://github\.com/[a-zA-Z0-9][\w.\-]{0,38}/[a-zA-Z0-9][\w.\-]{0,99}(\.git)?$"
-        if not re.match(pattern, cleaned):
+        if not lower.startswith("https://"):
             raise ValueError(
-                "Only public GitHub HTTPS URLs are accepted "
+                "Only HTTPS git URLs are accepted "
                 "(e.g. https://github.com/owner/repo)."
             )
+
+        parts = urlsplit(cleaned)
+
+        # Credentials in the authority are both a leak risk and a classic
+        # way to disguise the real host (https://github.com@evil.com/...).
+        if "@" in parts.netloc:
+            raise ValueError("URLs containing credentials are not allowed.")
+
+        host = parts.netloc.lower()
+        if host not in settings.ALLOWED_GIT_HOSTS:
+            allowed = ", ".join(sorted(settings.ALLOWED_GIT_HOSTS))
+            raise ValueError(
+                f"'{host}' is not an allowed git host. "
+                f"Accepted hosts: {allowed}. "
+                f"Self-hosted instances are added via GIT_ALLOWED_HOSTS."
+            )
+
+        # Nothing downstream reads these, and they only widen the surface.
+        if parts.query:
+            raise ValueError("Query strings are not allowed in repository URLs.")
+        if parts.fragment:
+            raise ValueError("Fragments are not allowed in repository URLs.")
+
+        segments = [s for s in parts.path.split("/") if s]
+        if len(segments) < 2:
+            raise ValueError(
+                "URL must include an owner and a repository "
+                "(e.g. https://github.com/owner/repo)."
+            )
+        if len(segments) > MAX_PATH_SEGMENTS:
+            raise ValueError(
+                f"Repository path is too deeply nested "
+                f"(max {MAX_PATH_SEGMENTS} segments)."
+            )
+
+        for segment in segments:
+            if not _PATH_SEGMENT.match(segment) or segment.endswith("."):
+                raise ValueError(f"Invalid path segment: {segment!r}")
+
         return cleaned
 
 

@@ -12,7 +12,7 @@
 
 ---
 
-Ducked is an ephemeral code execution platform that clones any public GitHub repository, builds it inside an isolated Docker container with brutal resource constraints, lets it live for exactly **60 seconds**, then destroys everything — container, image, and cloned files. Zero traces remain.
+Ducked is an ephemeral code execution platform that clones any public repository — GitHub, GitLab, Codeberg, Gitea, or your own self-hosted forge — builds it inside an isolated Docker container with brutal resource constraints, lets it live for exactly **60 seconds**, then destroys everything — container, image, and cloned files. Zero traces remain.
 
 <p align="center">
   <img src="docs/demo.png" alt="Ducked Engine Interface" width="800">
@@ -122,7 +122,7 @@ make dev
 # or: cd backend && python main.py
 ```
 
-The engine starts at `http://localhost:9000` (port can be changed via `.env`). Open it in your browser, paste a GitHub URL (currently only GitHub is supported), and watch.
+The engine starts at `http://localhost:9000` (port can be changed via `.env`). Open it in your browser, paste a repository URL, and watch.
 
 > **Note:** The Live Preview panel requires HTTPS with a real domain (see [Production Deployment](#production-deployment)). On localhost, builds run correctly but the preview iframe will not load.
 
@@ -134,6 +134,28 @@ The engine starts at `http://localhost:9000` (port can be changed via `.env`). O
 |----------|---------|-------------|
 | `DISCORD_WEBHOOK_URL` | `None` | Discord webhook for operational alerts |
 | `ACME_EMAIL` | `thevalmarch@gmail.com` | Email for Let's Encrypt certificates (Traefik) |
+| `API_PORT` | `9000` | Port the engine listens on |
+| `GIT_ALLOWED_HOSTS` | *(empty)* | Extra git forges to accept, comma separated (see below) |
+
+### Supported Git Forges
+
+Out of the box the engine accepts `github.com`, `gitlab.com`, `codeberg.org`, and
+`gitea.com`. Add self-hosted instances with `GIT_ALLOWED_HOSTS`:
+
+```bash
+GIT_ALLOWED_HOSTS=git.example.com,forge.internal:3000
+```
+
+This is an **allowlist, and it is a security boundary, not a convenience
+setting.** `git clone` runs server-side, so any host you add is a host the engine
+will reach out to on a user's behalf. Never open it to arbitrary hosts, and only
+add instances you control or trust. Include the port if the instance uses a
+non-standard one — the whole authority must match.
+
+Repository size is checked before cloning on GitHub (REST API) and on
+Gitea/Forgejo instances (`/api/v1/repos`). GitLab does not expose size to
+unauthenticated readers, so those clones are bounded by the post-clone disk check
+and the clone timeout instead.
 
 See [`.env.example`](.env.example) for a ready-to-use template.
 
@@ -248,7 +270,7 @@ That's not a bug. That's the feature.
 
 - [x] Component-based frontend architecture (split the single-file SPA into ES modules)
 - [x] Serve the session TTL from the API instead of hardcoding it in the frontend
-- [ ] Support for self-hosted Git instances (Forgejo, GitLab, Gitea)
+- [x] Support for self-hosted Git instances (Forgejo, GitLab, Gitea)
 
 See [ROADMAP.md](ROADMAP.md) for the full plan and rationale.
 

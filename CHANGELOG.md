@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Self-hosted git forge support**: the engine now clones from GitHub, GitLab, Codeberg, and Gitea, plus any self-hosted instance listed in the new `GIT_ALLOWED_HOSTS` environment variable. Pre-clone size checks work against the GitHub REST API and the Gitea/Forgejo API; GitLab falls back to the post-clone disk check. GitLab subgroup paths are supported.
 - **Session TTL served from the API**: the frontend reads `container_ttl_seconds` from `/api/health` at page load instead of hardcoding 60. The countdown, the TTL constraint label, and the timer placeholder now follow `CONTAINER_TTL_SECONDS`, so changing it in `backend/config.py` no longer leaves the UI lying about how long a container has left. Falls back to 60 if the engine is unreachable.
 
 ### Changed
@@ -16,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Frontend architecture**: split the single 1,249-line `index.html` into separate stylesheets and ES modules. `index.html` is now 137 lines of markup; CSS lives in `frontend/css/`, JavaScript in `frontend/js/` with per-concern modules (config, store, api, socket, router) and components (watcher, terminal, countdown, phaseBar). No build step, no new dependencies, no backend changes — behavior-preserving.
 - Inline `onclick` attributes replaced with `addEventListener` bindings, required because ES modules do not share global scope.
 - The watcher's face is now defined once in a `<template>` and cloned into the idle and destroyed states rather than duplicated in markup.
+
+### Security
+
+- Repository URL validation no longer relies on a GitHub-specific regex. It parses the URL and checks the authority against an allowlist, which is the primary SSRF defence now that arbitrary forges are permitted. Credentials in the authority (`https://github.com@evil.com/...`), query strings, fragments, non-HTTPS schemes, and path segments that do not start with an alphanumeric (blocking `.` and `..` traversal) are all rejected.
 
 ## [0.1.0] — 2026-07-22
 

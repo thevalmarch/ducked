@@ -27,8 +27,25 @@ class Settings:
     CLONE_TIMEOUT_SECONDS: int = 60
 
     # ── Repo Size Limits ──────────────────────────────────────────
-    MAX_REPO_SIZE_MB: int = 50               # Pre-clone GitHub API check (KB→MB)
+    MAX_REPO_SIZE_MB: int = 50               # Pre-clone forge API check (KB→MB)
     MAX_CLONE_DISK_MB: int = 100             # Post-clone actual disk check
+
+    # ── Git Forges ────────────────────────────────────────────────
+    # Hosts the engine will clone from. This allowlist is the primary
+    # SSRF defence: a URL whose host is not listed here is rejected
+    # before any network call is made. Never widen this to "any host" —
+    # git clone against an attacker-chosen host reaches whatever the
+    # engine can reach, including internal services.
+    #
+    # Self-hosted instances are added via GIT_ALLOWED_HOSTS (comma
+    # separated). Include the port if the instance uses a non-standard
+    # one, e.g. "forge.example.com:3000" — the whole authority must match.
+    ALLOWED_GIT_HOSTS: tuple = (
+        "github.com",
+        "gitlab.com",
+        "codeberg.org",     # Forgejo
+        "gitea.com",
+    )
 
     # ── Rate Limiting ─────────────────────────────────────────────
     RATE_LIMIT_PER_MINUTE: int = 3           # Max deploys per minute per IP
@@ -63,6 +80,15 @@ import os
 # Allow overriding from environment
 _env_webhook = os.getenv("DISCORD_WEBHOOK_URL")
 
+# Extra git forges, e.g. GIT_ALLOWED_HOSTS="git.acme.com,forge.internal:3000"
+# Appended to the defaults; entries are lowercased so comparison is exact.
+_env_hosts = tuple(
+    host.strip().lower()
+    for host in os.getenv("GIT_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+)
+
 settings = Settings(
-    DISCORD_WEBHOOK_URL=_env_webhook if _env_webhook else None
+    DISCORD_WEBHOOK_URL=_env_webhook if _env_webhook else None,
+    ALLOWED_GIT_HOSTS=Settings.ALLOWED_GIT_HOSTS + _env_hosts,
 )

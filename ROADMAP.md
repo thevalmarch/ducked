@@ -90,12 +90,38 @@ which leaves behaviour unchanged from before. No backend change was needed.
 
 ### Self-hosted Git instance support
 
-**Status:** Planned
-**Scope:** `backend/services/github_service.py`
+**Status:** Done
+**Scope:** `backend/config.py`, `backend/models.py`,
+`backend/services/github_service.py`
 
-Support cloning from Forgejo, GitLab, and Gitea in addition to GitHub. Requires
-generalizing URL validation and the pre-clone size check, which currently assumes
-the GitHub REST API.
+The engine clones from GitHub, GitLab, Codeberg, and Gitea out of the box, plus
+any self-hosted instance added via `GIT_ALLOWED_HOSTS`.
+
+URL validation no longer pattern-matches GitHub. It parses the URL and checks the
+authority against `settings.ALLOWED_GIT_HOSTS`, which is **the primary SSRF
+defence** — `git clone` runs server-side, so an unrestricted host would let a
+user point the engine at anything it can reach. The allowlist must never be
+widened to arbitrary hosts.
+
+Validation also rejects non-HTTPS schemes, credentials in the authority
+(`https://github.com@evil.com/...`), query strings, fragments, and any path
+segment that does not start alphanumeric — which rules out `.` and `..` traversal
+outright. GitLab subgroups are supported up to five path segments.
+
+Size checking is the only forge-specific part:
+
+| Forge | Pre-clone size check |
+|---|---|
+| GitHub | `api.github.com/repos/...` |
+| Gitea, Forgejo, Codeberg | `<host>/api/v1/repos/...` |
+| GitLab | none — size needs `?statistics=true`, which public readers cannot use |
+
+Where the API cannot answer, the clone falls through to the post-clone disk check
+bounded by `CLONE_TIMEOUT_SECONDS`. That is the same graceful degradation the
+GitHub path already had when its API was unreachable.
+
+Possible follow-up: `GitHubService` is now a misnomer — it handles every forge.
+Renaming it to `GitService` was left out to keep this change focused.
 
 ---
 
